@@ -10,14 +10,16 @@ import (
 
 //структура Вектор
 type Vector struct {
-	N    int
+	I    int
+	J    int
 	Data map[int][]float64
 }
 
 func CreateVect(size int, method matrMethods) *Vector {
 	data := method(size, 1)
 	return &Vector{
-		N:    size,
+		I:    size,
+		J: 1,
 		Data: data,
 	}
 }
@@ -25,7 +27,7 @@ func CreateVect(size int, method matrMethods) *Vector {
 //норма Вектора 1
 func (vect *Vector) VectNorm1() float64 {
 	var max float64 = vect.Data[0][0]
-	for i := 0; i < vect.N; i++ {
+	for i := 0; i < vect.I; i++ {
 		if vect.Data[i][0] > max {
 			max = vect.Data[i][0]
 		}
@@ -36,7 +38,7 @@ func (vect *Vector) VectNorm1() float64 {
 //норма Вектора 2
 func (vect *Vector) VectNorm2() float64 {
 	var sum float64 = 0
-	for i := 0; i < vect.N; i++ {
+	for i := 0; i < vect.I; i++ {
 		sum += vect.Data[i][0]
 	}
 	return sum
@@ -45,7 +47,7 @@ func (vect *Vector) VectNorm2() float64 {
 //норма Вектора 3
 func (vect *Vector) VectNorm3(accuracy float64) float64 {
 	var sum float64 = 0
-	for i := 0; i < vect.N; i++ {
+	for i := 0; i < vect.I; i++ {
 		sum += vect.Data[i][0] * vect.Data[i][0]
 	}
 	//точность нормы 3
@@ -71,6 +73,7 @@ func CreateMatr(i, j int, method matrMethods) *Matrix {
 			dataT[x] = append(dataT[x], data[y][x])
 		}
 	}
+	fmt.Println("Матрица", i, "*", j, "задана")
 	return &Matrix{
 		I:     i,
 		J:     j,
@@ -104,7 +107,7 @@ func (matr *Matrix) MatrixOutput(typeMatr string) {
 	fmt.Println("\n")
 	for i := 0; i < ii; i++ {
 		fmt.Printf("%5d ", i+1)
-		fmt.Printf("%8.f", data[i])
+		fmt.Printf("%8.3f", data[i])
 		fmt.Println()
 	}
 }
@@ -208,4 +211,62 @@ func KeyVect(size, j int) map[int][]float64 {
 //ввод Вектора с Rand
 func RandVect(size, j int) map[int][]float64 {
 	return RandMatr(size, j)
+}
+
+//решение СЛАУ методом Гаусса с выбором главного элемента
+func GaussMain(A, B *Matrix, accuracy float64) *Matrix {
+	AB := (*A)
+	AB.J = (*A).J + 1
+	for i := 0; i < (*A).I; i++ {
+		AB.Data[i] = append(AB.Data[i], (*B).Data[i][0])
+	}
+	fmt.Println(AB)
+	var n = AB.I //число уравнений
+	//MAX в строке
+	for i := 0; i < n; i++ {
+		max := math.Abs(AB.Data[i][i])
+		maxRow := i
+		for k := i + 1; k < n; k++ {
+			if math.Abs(AB.Data[i][i]) > max{
+				max = math.Abs(AB.Data[i][i])
+				maxRow = k
+			}
+		}
+		//меняем местами строку с наибольшим элементом
+		for k := i; k < n + 1; k++ {
+			c := (*A).Data[maxRow][k]
+			AB.Data[maxRow][k] = AB.Data[i][k]
+			AB.Data[i][k] = c
+		}
+		//обнуляем все строки ниже текущей
+		for k := i + 1; k < n; k++ {
+			c := -AB.Data[k][i] / AB.Data[i][i]
+			for j := i; j < n + 1; j++ {
+				if i == j {
+					AB.Data[k][j] = 0
+				} else {
+					AB.Data[k][j] += c * AB.Data[i][j]
+				}
+			}
+		}
+	}
+
+	//решаем для верхнего треугольника
+	x := make(map[int][]float64)
+	for i := n - 1; i > -1; i-- {
+		x[i] = append(x[i], AB.Data[i][n] / AB.Data[i][i])
+		for k := i - 1; k > -1; k-- {
+			AB.Data[k][n] -= AB.Data[k][i] * x[i][0]
+		}
+	}
+
+	//округляем результаты
+	accur := math.Pow(10, accuracy)
+	for i := 0; i < n; i++ {
+		x[i][0] = math.Round(x[i][0]*accur) / accur
+	}
+	return &Matrix{
+		I: n,
+		Data: x,
+	}
 }
